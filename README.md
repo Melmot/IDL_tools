@@ -38,7 +38,7 @@ Converts Julian dates to decimal years, taking leap years into account.
 decimal_year = yearfrac(jdt)
 ```
 
-### Arrays and statistics
+### Statistics and fitting
 
 #### `percentile`
 
@@ -69,20 +69,29 @@ counts = histerr(values, errors=errors, binsize=1, $
   expected=expected, sigma=sigma)
 ```
 
+#### `devcut`
+
+Performs iterative sigma clipping along a selected array dimension. It returns
+a validity mask by default, or rejected flat indices with `/index`.
+
+```idl
+mask = devcut(data, dim=2, nsigma=3)
+indices = devcut(values, nsigma=2.5, /index)
+```
+
+`/onlytop` rejects only positive deviations. An initial `mask` may be supplied;
+it is updated in place. `std`, `avg`, and `dev` return the final statistics,
+while `count` returns the number of iterations.
+
+### Array utilities
+
 #### `arr_match`
 
-Returns pairs of flat indices containing equal values in two arrays.
+Returns pairs of flat indices containing equal values in two arrays. Duplicate
+values produce all matching pairs; `-1` is returned when there are no matches.
 
 ```idl
 matches = arr_match(array1, array2)
-```
-
-#### `linearize`
-
-Finds the interval with the most precisely determined non-zero linear slope.
-
-```idl
-parameters = linearize(values, x=x, range=range, fit=fit)
 ```
 
 #### `sign`
@@ -92,6 +101,21 @@ Returns `-1`, `0`, or `1` according to the sign of each scalar or array value.
 ```idl
 directions = sign(values)
 ```
+
+### Numerical analysis
+
+#### `linearize`
+
+Finds the interval with the most precisely determined non-zero linear slope
+and returns its linear-fit parameters.
+
+```idl
+parameters = linearize(values, x=x, range=range, fit=fit)
+```
+
+`range` specifies the search limits on input and returns the selected interval.
+`minlen` sets its minimum length, `err` supplies point uncertainties, and
+`fit` returns the fitted values.
 
 #### `tsmooth`
 
@@ -112,21 +136,7 @@ derivative_x = parder(x, array, dim=1)
 derivative_y = parder(y, array, dim=2)
 ```
 
-#### `devcut`
-
-Performs iterative sigma clipping along a selected array dimension. It returns
-a validity mask by default, or rejected flat indices with `/index`.
-
-```idl
-mask = devcut(data, dim=2, nsigma=3)
-indices = devcut(values, nsigma=2.5, /index)
-```
-
-`/onlytop` rejects only positive deviations. An initial `mask` may be supplied;
-it is updated in place. `std`, `avg`, and `dev` return the final statistics,
-while `count` returns the number of iterations.
-
-### Binary arrays
+### Files and data exchange
 
 #### `write_bin` and `read_bin`
 
@@ -151,7 +161,28 @@ Dimensions are written in IDL order (the first dimension varies fastest).
 For large `byte` or `int` arrays this is usually more compact than an IDL save
 file, but it stores no variable names or other metadata.
 
-### Images
+#### `write_csv`
+
+Writes a two-dimensional array to a delimited text file.
+
+```idl
+write_csv, 'table.csv', data
+write_csv, 'table.tsv', data, headers=headers, delimiter=string(9b)
+```
+
+The default delimiter is a semicolon.
+
+#### `hdr_struct`
+
+Converts a string-array FITS header to an IDL structure. `descriptions`
+returns the comments associated with its fields; `comments` and `history`
+return the corresponding FITS cards.
+
+```idl
+header_struct = hdr_struct(header, descriptions=descriptions)
+```
+
+### Image alignment
 
 #### `phaseshift`
 
@@ -167,32 +198,70 @@ required. The original idea was proposed by Artem Ulyanov.
 
 #### `findshift`
 
-Finds an arbitrary periodic image shift by FFT correlation and refines it to
-subpixel precision.
+Finds the periodic displacement of `image1` relative to `image2` and returns
+it with subpixel precision.
 
 ```idl
-shift = findshift(image1, image2, corr=correlation)
+shift = findshift(image1, image2, corr=correlation, intshft=integer_shift)
 ```
+
+`corr` returns the correlation map and `intshft` the shift before subpixel
+refinement.
+
+### Interactive image tools
 
 #### `plot_clicker`
 
-Digitizes points from an image file. Dragging across the plotting area defines
-the axis frame, which is updated while dragging; its orientation is detected
-automatically. The left mouse button adds points. Dragging near an existing
-point moves it; frame corners can be moved in the same way. The right button
-deletes a nearby point. Closing the window finishes and returns the selected
-coordinates. The frame and selected points are drawn in red. Large images are
-reduced to fit the screen.
+Digitizes points from an image file. The first, required step is calibration:
+press the left mouse button at one corner of the plot frame, drag to the
+opposite corner, and release. The corner order does not matter. After that,
+left-click to add a point. To move an existing point or a frame corner, press
+the left button near it, drag, and release. Right-click near a point to delete
+it. Close the window to finish and return the selected coordinates.
 
 ```idl
 plot_clicker, 'plot.png', [xmin, xmax], [ymin, ymax], x, y
 ```
 
-The second and third arguments give the axis ranges. The calibration can be
-reused with `box=box`; `/xlog` and `/ylog` select logarithmic axes, while
-`zoom=2` enlarges the image by up to a factor of two. `radius=8` sets the
-point selection distance in screen pixels. The resulting window is always
-limited by the screen size.
+The second and third arguments give the axis ranges. A previous calibration
+can be reused with `box=box`, skipping the first step. `/xlog` and `/ylog`
+select logarithmic axes. `zoom=2` requests twofold enlargement, limited by the
+screen size. `radius=8` sets how close, in screen pixels, the cursor must be to
+select an existing point or frame corner. `color` sets the packed RGB color of
+the frame and points and defaults to red.
+
+#### `draw_curve`
+
+Interactively draws a spline on a two-dimensional or RGB array and returns its
+pixel coordinates. RGB arrays may use any of the standard IDL channel layouts.
+
+```idl
+image = bytscl(data)
+curve = draw_curve(image, step=0.5, zoom=2, radius=8, color='00ffff'xl)
+
+values = interpolate(data, curve.x, curve.y, cubic=-0.5)
+dx = curve.x[1:*] - curve.x
+dy = curve.y[1:*] - curve.y
+distance = [0D, total(sqrt(dx^2 + dy^2), /cumulative, /double)]
+plot, distance, values
+```
+
+Left-click to add a control point. Left-click near an existing point and drag
+to move it; left-click near the curve to insert a point at that position.
+Right-click near a control point to remove it. The spline appears after the
+third point is added. The `+` and `-` buttons change the display scale, the
+`Step` field changes the output spacing, `Clear` removes all points, and
+`Done` finishes.
+
+The returned points are distributed uniformly along the curve. `step` sets
+their target spacing in input-array elements and defaults to `1`.
+`zoom` sets the initial display scale and defaults to `1`. The `+` and `-`
+buttons change the current scale by a factor of two. `radius` sets the selection
+distance for existing control points and the curve in screen pixels and defaults to `5`.
+`color` sets the packed RGB color of the spline and control points and defaults
+to yellow. Two-dimensional images use the active IDL color table.
+
+### Image processing and transforms
 
 #### `dedefect`
 
@@ -209,22 +278,33 @@ to the smoothed image, and `width` is the smoothing width.
 
 #### `despike_cube`
 
-Replaces bright temporal spikes in a three-dimensional image cube.
+Replaces bright temporal spikes in a three-dimensional image cube. The cube
+is modified in place.
 
 ```idl
 despike_cube, cube, threshold=1.1, width=2
 ```
 
+Each frame is compared with the temporal median of `width` neighboring frames
+on either side. Pixels exceeding it by the factor `threshold` are replaced.
+
 #### `solar2polar` and `polar2solar`
 
 Convert solar images between Cartesian and rectangular radius-angle forms.
+Both functions use the image geometry stored in a FITS header.
 
 ```idl
 polar = solar2polar(image, header, /interp)
 image = polar2solar(polar, header, /interp)
 ```
 
-### Strings and structures
+For `solar2polar`, radial limits may be given in solar radii with `rmin` and
+`rmax`, or as heights in kilometres with `hmin` and `hmax`. `polar2solar`
+uses `rmin` or `hmin` for the first row of the polar map. Angular positions
+are measured in degrees clockwise from solar north; `fires` and `hres` set
+the angular and radial steps.
+
+### Strings
 
 #### `firstcap`
 
@@ -244,6 +324,8 @@ standard integer suffixes. Non-numeric strings are returned unchanged.
 value = unstring('12.5')
 count = unstring('100l')
 ```
+
+### Structures
 
 #### `write_tag`
 
@@ -269,27 +351,6 @@ strhelp, structure
 strhelp, structure, return_tags=tags, return_types=types, $
   return_vals=values, /noprint
 ```
-
-#### `hdr_struct`
-
-Converts a string-array FITS header to an IDL structure.
-
-```idl
-header_struct = hdr_struct(header)
-```
-
-### Text files
-
-#### `write_csv`
-
-Writes a two-dimensional array to a delimited text file.
-
-```idl
-write_csv, 'table.csv', data
-write_csv, 'table.tsv', data, headers=headers, delimiter=string(9b)
-```
-
-The default delimiter is a semicolon.
 
 ### Widgets
 

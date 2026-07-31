@@ -4,7 +4,7 @@
 ; left, bottom, right, and top device coordinates and may be reused as input.
 ; Keywords: xlog and ylog select logarithmic axes, zoom sets the display
 ; scale, radius sets the point selection distance in pixels, nomark suppresses
-; point markers.
+; point markers, color sets the packed RGB color of the frame and points.
 
 function plot_clicker_window_open, window_id
 	device, window_state=states
@@ -13,7 +13,7 @@ function plot_clicker_window_open, window_id
 end
 
 pro plot_clicker, file, xrange, yrange, x, y, box=box, xlog=xlog, $
-		ylog=ylog, zoom=zoom, radius=radius, nomark=nomark
+		ylog=ylog, zoom=zoom, radius=radius, color=color, nomark=nomark
 	if size(file, /type) ne 7 or n_elements(file) ne 1 then $
 		message, 'file must be a scalar string'
 	if not file_test(file) then message, 'File not found: ' + file
@@ -29,16 +29,31 @@ pro plot_clicker, file, xrange, yrange, x, y, box=box, xlog=xlog, $
 	if keyword_set(ylog) and min(yrange) le 0 then $
 		message, 'yrange must be positive for a logarithmic axis'
 
+	numeric_types = [1, 2, 3, 4, 5, 12, 13, 14, 15]
 	if n_elements(zoom) eq 0 then begin
 		zoom_factor = 1D
 	endif else begin
 		zoom_type = size(zoom, /type)
-		numeric_types = [1, 2, 3, 4, 5, 12, 13, 14, 15]
 		if n_elements(zoom) ne 1 or $
 				total(zoom_type eq numeric_types) eq 0 then $
 			message, 'zoom must be a positive scalar number'
 		zoom_factor = double(zoom)
 		if zoom_factor le 0 then message, 'zoom must be positive'
+	endelse
+	if n_elements(color) eq 0 then begin
+		color = 255L
+	endif else begin
+		if n_elements(color) ne 1 then $
+			message, 'color must be a packed RGB scalar'
+		color_type = size(color, /type)
+		if total(color_type eq numeric_types) eq 0 then $
+			message, 'color must be a packed RGB scalar'
+		color = double(color)
+		if finite(color) eq 0 then $
+			message, 'color must be an integer from 0 to 16777215'
+		if color ne floor(color) or color lt 0 or color gt 16777215D then $
+			message, 'color must be an integer from 0 to 16777215'
+		color = long(color)
 	endelse
 
 	if n_elements(radius) eq 0 then begin
@@ -101,7 +116,6 @@ pro plot_clicker, file, xrange, yrange, x, y, box=box, xlog=xlog, $
 		endelse
 	endelse
 	device, decomposed=1
-	red_color = 255L
 
 	box_valid = 0B
 	if n_elements(box) ne 0 then begin
@@ -144,7 +158,7 @@ pro plot_clicker, file, xrange, yrange, x, y, box=box, xlog=xlog, $
 				device, decomposed=1
 			endelse
 			plots, [x0, x1, x1, x0, x0], [y0, y0, y1, y1, y0], $
-				/device, color=red_color
+				/device, color=color
 			wait, 0.01
 		endwhile
 		if not plot_clicker_window_open(window_id) then begin
@@ -174,7 +188,7 @@ pro plot_clicker, file, xrange, yrange, x, y, box=box, xlog=xlog, $
 
 	plots, [box[0], box[2], box[2], box[0], box[0]], $
 		[box[1], box[1], box[3], box[3], box[1]], /device, $
-		color=red_color
+		color=color
 
 	xlimits = double(xrange)
 	ylimits = double(yrange)
@@ -227,9 +241,9 @@ pro plot_clicker, file, xrange, yrange, x, y, box=box, xlog=xlog, $
 			endelse
 			plots, [box[0], box[2], box[2], box[0], box[0]], $
 				[box[1], box[1], box[3], box[3], box[1]], /device, $
-				color=red_color
+				color=color
 			if count gt 0 and not keyword_set(nomark) then $
-				plots, px, py, /device, psym=1, color=red_color
+				plots, px, py, /device, psym=1, color=color
 			while plot_clicker_window_open(window_id) and $
 					!mouse.button ne 0 do begin
 				cursor, xd, yd, /device, /nowait
@@ -316,9 +330,9 @@ pro plot_clicker, file, xrange, yrange, x, y, box=box, xlog=xlog, $
 			endelse
 			plots, [box[0], box[2], box[2], box[0], box[0]], $
 				[box[1], box[1], box[3], box[3], box[1]], /device, $
-				color=red_color
+				color=color
 			if not keyword_set(nomark) then $
-				plots, px, py, /device, psym=1, color=red_color
+				plots, px, py, /device, psym=1, color=color
 			wait, 0.01
 		endwhile
 
