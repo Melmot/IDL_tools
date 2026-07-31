@@ -11,7 +11,7 @@ function polar2solar, polar_map, header, rmin=rmin, hmin=hmin, $
 		message, 'POLAR_MAP must be 2-dimensional.'
 	if n_elements(missing) eq 0 then missing = 0
 
-	geometry = solar_image_geometry(header)
+	geometry = solgeom(header)
 	dims = size(polar_map, /dimensions)
 	solar_radius_km = 696300D
 

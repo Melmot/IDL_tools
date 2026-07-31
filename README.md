@@ -292,6 +292,7 @@ on either side. Pixels exceeding it by the factor `threshold` are replaced.
 
 Convert solar images between Cartesian and rectangular radius-angle forms.
 Both functions use the image geometry stored in a FITS header.
+Both require the auxiliary `solgeom.pro`.
 
 ```idl
 polar = solar2polar(image, header, /interp)

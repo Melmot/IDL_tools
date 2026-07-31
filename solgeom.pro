@@ -1,8 +1,8 @@
 ; Extract solar image geometry used by solar2polar and polar2solar.
-; geometry = solar_image_geometry(header)
+; geometry = solgeom(header)
 ; header may be a FITS card array or a compatible structure.
 
-function solar_image_geometry, header
+function solgeom, header
 	if size(header, /type) eq 7 then header = hdr_struct(header)
 	if size(header, /type) ne 8 then $
 		message, 'HEADER must be a FITS card array or structure.'
